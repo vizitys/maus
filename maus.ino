@@ -4,44 +4,16 @@
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 
-BleMouse bleMouse("Maus");
+BleMouse bleMouse("Maus", "Maus", 69);
 
 Adafruit_MPU6050 mpu;
 
-float *bufferX;
-float *bufferY;
-float *bufferZ;
-int bufferSize = 10; // Initial buffer size
-
-float movingAverageFilter(float input, float *buffer, int bufferSizeME)
-{
-  // Shift buffer values to the left
-  for (int i = 0; i < bufferSizeME - 1; i++)
-  {
-    buffer[i] = buffer[i + 1];
-  }
-
-  // Add new input value to buffer
-  buffer[bufferSizeME - 1] = input;
-
-  // Calculate moving average
-  float sum = 0.0;
-  for (int i = 0; i < bufferSizeME; i++)
-  {
-    sum += buffer[i];
-  }
-  float output = sum / bufferSizeME;
-
-  return output;
-}
+const int scanFrequency = 1000; // Hz
+const int sensitivity = 100;
+const int num_samples = 10;
 
 void setup()
 {
-  // Allocate memory for buffer arrays
-  bufferX = new float[bufferSize];
-  bufferY = new float[bufferSize];
-  bufferZ = new float[bufferSize];
-
   Serial.begin(115200);
 
   while (!Serial)
@@ -57,7 +29,7 @@ void setup()
   }
   Serial.println("MPU6050 Found!");
 
-  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
   Serial.print("Accelerometer range set to: ");
   switch (mpu.getAccelerometerRange())
   {
@@ -93,7 +65,7 @@ void setup()
     break;
   }
 
-  mpu.setFilterBandwidth(MPU6050_BAND_5_HZ);
+  mpu.setFilterBandwidth(MPU6050_BAND_94_HZ);
   Serial.print("Filter bandwidth set to: ");
   switch (mpu.getFilterBandwidth())
   {
@@ -129,38 +101,51 @@ void setup()
 
 void loop()
 {
-  float filteredX = 0.0;
-  float filteredY = 0.0;
-  float filteredZ = 0.0;
-
-  unsigned long startTime;
-
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  float stdDev = sqrt(pow(a.acceleration.x, 2) + pow(a.acceleration.y, 2) + pow(a.acceleration.z, 2));
-
-  if (stdDev > 1.0)
-  {
-    bufferSize = 20;
-  }
-  else
-  {
-    bufferSize = 10;
-  }
-
-  filteredX = movingAverageFilter(a.acceleration.x, bufferX, bufferSize);
-  filteredY = movingAverageFilter(a.acceleration.y, bufferY, bufferSize);
-  filteredZ = movingAverageFilter(a.acceleration.z, bufferZ, bufferSize);
-
-  // Output normalized values
-  Serial.print("Normalized Acceleration X: ");
-  Serial.print(filteredX);
+  Serial.print("Non-normalized Acceleration X: ");
+  Serial.print(a.acceleration.x);
   Serial.print(", Y: ");
-  Serial.print(filteredY);
+  Serial.print(a.acceleration.y);
   Serial.print(", Z: ");
-  Serial.println(filteredZ);
+  Serial.println(a.acceleration.z);
+
+  static float x_acc_avg = 0;
+  static float y_acc_avg = 0;
+  static int count = 0;
 
   if (bleMouse.isConnected())
-    bleMouse.move(filteredY, filteredZ);
+  {
+    // Calculate moving average of acceleration values
+    x_acc_avg = (x_acc_avg * count + a.acceleration.y) / (count + 1);
+    y_acc_avg = (y_acc_avg * count + a.acceleration.z) / (count + 1);
+    count++;
+
+    if (count > num_samples)
+    {
+      // Adjust mouse movement based on rotation and moving average
+      int x = (x_acc_avg - (g.gyro.x * 0.1)) * -sensitivity;
+      int y = (y_acc_avg + (g.gyro.y * 0.1)) * sensitivity;
+
+      if (abs(x) < 5)
+        x = 0;
+      if (abs(y) < 5)
+        y = 0;
+
+      Serial.print("X: ");
+      Serial.print(x);
+      Serial.print(", Y: ");
+      Serial.println(y);
+
+      bleMouse.move(x, y);
+
+      // Reset moving average and count
+      x_acc_avg = 0;
+      y_acc_avg = 0;
+      count = 0;
+    }
+  }
+
+  delay(1000 / scanFrequency);
 }
