@@ -120,49 +120,56 @@ void loop()
   static float y_acc_avg = 0;
   static int count = 0;
 
-  if (bleMouse.isConnected())
+  // Calculate moving average of acceleration values
+  x_acc_avg = (x_acc_avg * count + a.acceleration.y) / (count + 1);
+  y_acc_avg = (y_acc_avg * count + a.acceleration.y) / (count + 1);
+  count++;
+
+  if (count > num_samples)
   {
-    // Calculate moving average of acceleration values
-    x_acc_avg = (x_acc_avg * count + a.acceleration.y) / (count + 1);
-    y_acc_avg = (y_acc_avg * count + a.acceleration.y) / (count + 1);
-    count++;
+    // Adjust mouse movement based on rotation and moving average
+    int x = (x_acc_avg - (g.gyro.x * 0.1)) * -sensitivity;
+    int y = (y_acc_avg + (g.gyro.y * 0.1)) * sensitivity;
 
-    if (count > num_samples)
-    {
-      // Adjust mouse movement based on rotation and moving average
-      int x = (x_acc_avg - (g.gyro.x * 0.1)) * -sensitivity;
-      int y = (y_acc_avg + (g.gyro.y * 0.1)) * sensitivity;
+    if (abs(x) < 5)
+      x = 0;
+    if (abs(y) < 5)
+      y = 0;
 
-      if (abs(x) < 5)
-        x = 0;
-      if (abs(y) < 5)
-        y = 0;
+    Serial.print("X: ");
+    Serial.print(x);
+    Serial.print(", Y: ");
+    Serial.println(y);
 
-      Serial.print("X: ");
-      Serial.print(x);
-      Serial.print(", Y: ");
-      Serial.println(y);
+    // Reset moving average and count
+    x_acc_avg = 0;
+    y_acc_avg = 0;
+    count = 0;
+  }
 
-      bleMouse.move(x, y);
-
-      // Reset moving average and count
-      x_acc_avg = 0;
-      y_acc_avg = 0;
-      count = 0;
-    }
-
+  if (!bleMouse.isPressed(MOUSE_LEFT))
+  {
     if (digitalRead(leftBtn) == HIGH)
     {
       Serial.println("MOUSE LEFT CLICKED");
-      bleMouse.click(MOUSE_LEFT);
+      bleMouse.press(MOUSE_LEFT);
     }
+  }
+  else
+    bleMouse.release(MOUSE_LEFT);
 
+  if (!bleMouse.isPressed(MOUSE_RIGHT))
+  {
     if (digitalRead(rightBtn) == HIGH)
     {
       Serial.println("MOUSE RIGHT CLICKED");
-      bleMouse.click(MOUSE_RIGHT);
+      bleMouse.press(MOUSE_RIGHT);
     }
   }
+  else
+    bleMouse.release(MOUSE_RIGHT);
+
+  bleMouse.move(vx, vy);
 
   delay(1000 / scanFrequency);
 }
