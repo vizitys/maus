@@ -11,12 +11,14 @@ Adafruit_MPU6050 mpu;
 const int scanFrequency = 1000; // Hz
 const int sensitivity = 100;
 const int num_samples = 10;
-int leftBtn = 18;
+
+const int leftBtn = 18;
+const int rightBtn = 19;
 
 void setup()
 {
-  pinMode(19, INPUT);
-  pinMode(18, INPUT);
+  pinMode(leftBtn, INPUT);
+  pinMode(rightBtn, INPUT);
 
   Serial.begin(115200);
 
@@ -101,8 +103,6 @@ void setup()
 
   Serial.println("Starting BLE");
   bleMouse.begin();
-
-
 }
 
 void loop()
@@ -119,7 +119,7 @@ void loop()
   static float x_acc_avg = 0;
   static float y_acc_avg = 0;
   static int count = 0;
-  
+
   if (bleMouse.isConnected())
   {
     // Calculate moving average of acceleration values
@@ -151,20 +151,18 @@ void loop()
       count = 0;
     }
 
-    if (digitalRead(19) == HIGH) {
-      Serial.println("\nMOUSE LEFT CLICKED\n");
+    if (digitalRead(leftBtn) == HIGH)
+    {
+      Serial.println("MOUSE LEFT CLICKED");
       bleMouse.click(MOUSE_LEFT);
-
     }
 
-    if (digitalRead(18) == HIGH) {
-      Serial.println("\nMOUSE RIGHT CLICKED\n");
+    if (digitalRead(rightBtn) == HIGH)
+    {
+      Serial.println("MOUSE RIGHT CLICKED");
       bleMouse.click(MOUSE_RIGHT);
-
     }
   }
-
-
 
   delay(1000 / scanFrequency);
 }
