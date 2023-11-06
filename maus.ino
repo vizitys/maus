@@ -8,12 +8,22 @@ BleMouse bleMouse("Maus", "Maus", 69);
 
 Adafruit_MPU6050 mpu;
 
-const int scanFrequency = 1000; // Hz
+const int scanFrequency = 70; // Hz
 const int sensitivity = 100;
-const int num_samples = 10;
 
 const int leftBtn = 18;
 const int rightBtn = 19;
+
+// variables to keep track of how long each button has been held for
+int startPressedL = 0;
+int startPressedR = 0;
+int endPressedL = 0;
+int endPressedR = 0;
+
+const int calibrationThreshold = 5000; // ms, how long to hold both buttons for calibration
+
+int calibrationX = 0;
+int calibrationY = 0;
 
 void setup()
 {
@@ -109,65 +119,53 @@ void loop()
 {
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
-  Serial.print("Non-normalized Acceleration X: ");
-  Serial.print(a.acceleration.x);
-  Serial.print(", Y: ");
-  Serial.print(a.acceleration.y);
-  Serial.print(", Z: ");
-  Serial.println(a.acceleration.z);
 
-  static float x_acc_avg = 0;
-  static float y_acc_avg = 0;
-  static int count = 0;
+  double vx = g.gyro.y * sensitivity - calibrationX;
+  double vy = -g.gyro.z * sensitivity - calibrationY;
 
-  // Calculate moving average of acceleration values
-  x_acc_avg = (x_acc_avg * count + a.acceleration.y) / (count + 1);
-  y_acc_avg = (y_acc_avg * count + a.acceleration.y) / (count + 1);
-  count++;
+  Serial.print("X: ");
+  Serial.print(g.gyro.x);
+  Serial.print(" Y: ");
+  Serial.print(vx);
+  Serial.print(" Z: ");
+  Serial.println(vy);
 
-  if (count > num_samples)
+  if (digitalRead(leftBtn) == HIGH)
   {
-    // Adjust mouse movement based on rotation and moving average
-    int x = (x_acc_avg - (g.gyro.x * 0.1)) * -sensitivity;
-    int y = (y_acc_avg + (g.gyro.y * 0.1)) * sensitivity;
-
-    if (abs(x) < 5)
-      x = 0;
-    if (abs(y) < 5)
-      y = 0;
-
-    Serial.print("X: ");
-    Serial.print(x);
-    Serial.print(", Y: ");
-    Serial.println(y);
-
-    // Reset moving average and count
-    x_acc_avg = 0;
-    y_acc_avg = 0;
-    count = 0;
+    bleMouse.press(MOUSE_LEFT);
+    startPressedL = millis();
   }
-
-  if (!bleMouse.isPressed(MOUSE_LEFT))
+  else if (bleMouse.isPressed(MOUSE_LEFT))
   {
-    if (digitalRead(leftBtn) == HIGH)
-    {
-      Serial.println("MOUSE LEFT CLICKED");
-      bleMouse.press(MOUSE_LEFT);
-    }
-  }
-  else
     bleMouse.release(MOUSE_LEFT);
-
-  if (!bleMouse.isPressed(MOUSE_RIGHT))
-  {
-    if (digitalRead(rightBtn) == HIGH)
-    {
-      Serial.println("MOUSE RIGHT CLICKED");
-      bleMouse.press(MOUSE_RIGHT);
-    }
+    Serial.println("MOUSE LEFT CLICKED");
+    endPressedL = millis();
   }
-  else
+
+  if (digitalRead(rightBtn) == HIGH)
+  {
+    bleMouse.press(MOUSE_RIGHT);
+    startPressedR = millis();
+  }
+  else if (bleMouse.isPressed(MOUSE_RIGHT))
+  {
     bleMouse.release(MOUSE_RIGHT);
+    Serial.println("MOUSE RIGHT CLICKED");
+    endPressedR = millis();
+  }
+
+  int holdTimeL = startPressedL - endPressedL;
+  int holdTimeR = startPressedR - endPressedR;
+
+  Serial.println(holdTimeL);
+  Serial.println(holdTimeR);
+
+  if (holdTimeL > calibrationThreshold && holdTimeR > calibrationThreshold)
+  {
+    Serial.println("CALIBRATING");
+    calibrationX = vx;
+    calibrationY = vy;
+  }
 
   bleMouse.move(vx, vy);
 
