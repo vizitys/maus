@@ -120,8 +120,8 @@ void loop()
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  double vx = g.gyro.y * sensitivity - calibrationX;
-  double vy = -g.gyro.z * sensitivity - calibrationY;
+  double vx = g.gyro.z * sensitivity - calibrationX;
+  double vy = g.gyro.y * sensitivity - calibrationY;
 
   Serial.print("X: ");
   Serial.print(g.gyro.x);
