@@ -27,7 +27,6 @@ const int calibrationThreshold = 5000; // ms, how long to hold both buttons for 
 
 int calibrationX = 0;
 int calibrationY = 0;
-//int calibrationZ = 0;
 
 void setup()
 {
@@ -131,7 +130,6 @@ void loop()
   //Calibration
   double vx = g.gyro.z * sensitivity - calibrationX;
   double vy = g.gyro.y * sensitivity - calibrationY;
-  //double vz = g.gyro.x * sensitivity - calibrationZ;
 
   //Print gyro values in serial for debug
   Serial.print("X: ");
@@ -176,7 +174,6 @@ void loop()
     Serial.println("CALIBRATING");
     calibrationX = vx;
     calibrationY = vy;
-    //calibrationZ = vz;
   }
   //move mouse, delay for correct frequency
   bleMouse.move(vx, vy);
