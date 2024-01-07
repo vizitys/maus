@@ -7,15 +7,18 @@
 #include <Wire.h>
 
 // Initializing the BLE device with the name "Maus". Battery percentage defaults
-// to a constant value, as it is not measured by the device.
+// to a constant value, as it is currently not measured by the device.
 BleMouse bleMouse("Maus", "Maus", 69);
 // Initialize the gyro/acc meter
 Adafruit_MPU6050 mpu;
 
 // Settings
-const int scanFrequency = 70;  // Hz
-const int sensitivity = 100;  // Sensitivity adjustment. Sensitivity can also be
-                              // adjusted inside the OS.
+// How long to hold both buttons for calibration
+const int calibrationThreshold = 5000;  // ms
+// How often to read gyro values and move mouse (Hz)
+const int scanFrequency = 70;
+// Sensitivity adjustment. Sensitivity can also be adjusted in the OS.
+const int sensitivity = 100;
 
 // Constant values for pin numbers
 const int leftBtn = 18;
@@ -28,9 +31,6 @@ int startPressedR = 0;
 int endPressedL = 0;
 int endPressedR = 0;
 
-// How long to hold both buttons for calibration
-const int calibrationThreshold = 5000;  // ms
-
 // Current calibration values
 int calibrationX = 0;
 int calibrationY = 0;
@@ -40,7 +40,7 @@ void setup() {
   pinMode(leftBtn, INPUT);
   pinMode(rightBtn, INPUT);
 
-  // Start monitoring serial for debug
+  // Initialize the serial connection for debugging purposes
   Serial.begin(115200);
 
   // Wait for serial to connect
@@ -129,13 +129,17 @@ void setup() {
 }
 
 void loop() {
-  // Read gyro values, set as variables a, g and temp
+  // Read sensor values, set as variables a, g and temp
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
   // Set gyro values to variables
-  double vx = g.gyro.z * sensitivity - calibrationX;
-  double vy = g.gyro.y * sensitivity - calibrationY;
+  double vx = g.gyro.z * sensitivity;
+  double vy = -g.gyro.y * sensitivity;
+
+  // Calibrate gyro values by subtracting calibration values
+  double vxCalibrated = vx - calibrationX;
+  double vyCalibrated = vy - calibrationY;
 
   // Print gyro values in serial for debug
   // Serial.print("X: ");
@@ -165,6 +169,7 @@ void loop() {
     endPressedR = millis();
   }
 
+  // Calculate how long both buttons have been held for
   int holdTimeL = startPressedL - endPressedL;
   int holdTimeR = startPressedR - endPressedR;
 
@@ -174,12 +179,14 @@ void loop() {
 
   if (holdTimeL > calibrationThreshold && holdTimeR > calibrationThreshold) {
     Serial.println("CALIBRATING");
-    calibrationX = vx - calibrationX;
-    calibrationY = vy - calibrationY;
+    // set calibration values to current gyro values, so that the mouse does not
+    // drift
+    calibrationX = vx;
+    calibrationY = vy;
   }
 
-  // move mouse, delay for correct movement frequency
-  bleMouse.move(vx, vy);
+  // move mouse by calibrated values, delay for correct movement frequency
+  bleMouse.move(vxCalibrated, vyCalibrated);
 
   delay(1000 / scanFrequency);
 }
