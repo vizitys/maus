@@ -169,11 +169,10 @@ void loop()
   Serial.println(holdTimeL);
   Serial.println(holdTimeR);
 
-  if (holdTimeL > calibrationThreshold && holdTimeR > calibrationThreshold)
-  {
+  if (holdTimeL > calibrationThreshold && holdTimeR > calibrationThreshold) {
     Serial.println("CALIBRATING");
-    calibrationX = vx;
-    calibrationY = vy;
+    calibrationX = vx - calibrationX;
+    calibrationY = vy - calibrationY;
   }
   //move mouse, delay for correct frequency
   bleMouse.move(vx, vy);
